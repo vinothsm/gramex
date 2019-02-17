@@ -315,6 +315,10 @@ def create_alert(name, alert):
         attachments = alert['attachments']
         if isinstance(attachments, list):
             templates['attachments'] = [Template(path) for path in attachments]
+    if 'user' in alert:
+        user = alert['user']
+        if isinstance(user, dict):
+            templates['user'] = {cid: Template(path) for cid, path in user.items()}
 
     # Pre-compile data.
     #   - `data: {key: [...]}` -- loads data in-place
@@ -419,8 +423,14 @@ def create_alert(name, alert):
             # user: {id: ...} creates an X-Gramex-User header to mimic the user
             if 'user' in alert:
                 user = json.dumps(alert['user'], ensure_ascii=True, separators=(',', ':'))
+                new_user = {}
+                for cid, val in templates['user'].items():
+                    urlpath = val.generate(**data).decode('utf-8')
+                    urldata = urlfetch(urlpath, info=True, headers=headers)
+                    new_user[cid] = urldata['name']
+                new_user = json.dumps(new_user, ensure_ascii=True, separators=(',', ':'))
                 headers['X-Gramex-User'] = tornado.web.create_signed_value(
-                    info.app.settings['cookie_secret'], 'user', user)
+                    info.app.settings['cookie_secret'], 'user', new_user)
             if 'markdown' in kwargs:
                 kwargs['html'] = _markdown_convert(kwargs.pop('markdown'))
             if 'images' in templates:
@@ -442,6 +452,10 @@ def create_alert(name, alert):
                     urlfetch(attachment.generate(**data).decode('utf-8'), headers=headers)
                     for attachment in templates['attachments']
                 ]
+            if 'user' in templates:
+                for cid, val in templates['user'].items():
+                    urlpath = val.generate(**data).decode('utf-8')
+                    urldata = urlfetch(urlpath, info=True, headers=headers)
             if callable(callback):
                 return callback(**kwargs)
             # Email recipient. TODO: run this in a queue. (Anand)
