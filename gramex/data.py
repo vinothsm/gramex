@@ -426,11 +426,13 @@ def get_table(engine, table):
 
 def _pop_controls(args):
     '''Filter out data controls: sort, limit, offset and column (_c) from args'''
-    return {
+    controls = {
         key: args.pop(key)
         for key in ('_sort', '_limit', '_offset', '_c', '_by')
         if key in args
     }
+    controls.update({key: args.pop(key) for key in list(args.keys()) if key.startswith('_sort:')})
+    return controls
 
 
 def _pop_columns(data, cols, ignored):
@@ -560,8 +562,12 @@ def _filter_db_col(query, method, key, col, op, vals, column, conv, meta):
     return query
 
 
-def _filter_sort_columns(sort_filter, cols):
+def _filter_sort_columns(controls, cols):
     sorts, ignore_sorts = [], []
+    sort_filter = controls['_sort']
+    for key, val in controls.items():
+        if key.startswith('_sort:'):
+            sort_filter.append(('-' if val == 'desc' else '') + key[6:])
     for col in sort_filter:
         if col in cols:
             sorts.append((col, True))
@@ -719,7 +725,7 @@ def _filter_frame(data, meta, controls, args, source='select', id=[]):
             if len(hide_cols) > 0:
                 meta['ignored'].append(('_c', hide_cols))
         if '_sort' in controls:
-            meta['sort'], ignore_sorts = _filter_sort_columns(controls['_sort'], data.columns)
+            meta['sort'], ignore_sorts = _filter_sort_columns(controls, data.columns)
             if len(meta['sort']) > 0:
                 data = data.sort_values(by=[c[0] for c in meta['sort']],
                                         ascending=[c[1] for c in meta['sort']])
@@ -836,7 +842,7 @@ def _filter_db(engine, table, meta, controls, args, source='select', id=[]):
                 return pd.DataFrame()
         if '_sort' in controls:
             meta['sort'], ignore_sorts = _filter_sort_columns(
-                controls['_sort'], colslist + query.columns.keys())
+                controls, colslist + query.columns.keys())
             for col, asc in meta['sort']:
                 orderby = sqlalchemy.asc if asc else sqlalchemy.desc
                 query = query.order_by(orderby(col))

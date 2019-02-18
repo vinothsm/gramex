@@ -708,3 +708,16 @@ class TestFilterColsDB(FilterColsMixin):
     @classmethod
     def tearDownClass(cls):
         dbutils.sqlite_drop_db('test_filtercols.db')
+
+
+class TestMultiSort(unittest.TestCase):
+    def test_sort(self):
+        sales = gramex.cache.open(sales_file, 'xlsx')
+        eqframe(
+            gramex.data.filter(sales, args={'_sort:sales': ['asc']}),
+            sales.sort_values('sales'),
+        )
+        eqframe(
+            gramex.data.filter(sales, args={'_sort:sales': ['desc']}),
+            sales.sort_values('sales', ascending=False),
+        )
