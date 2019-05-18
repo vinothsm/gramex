@@ -83,7 +83,7 @@ class DFSearch(object):
     """Make a dataframe searchable."""
 
     def __init__(self, df, nlp=None, **kwargs):
-        """Default constrictor.
+        """Default constructor.
 
         Parameters
         ----------
