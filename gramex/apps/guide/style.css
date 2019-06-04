@@ -1,11 +1,12 @@
-@import "ui/bootstraptheme.css?primary=%235b9bd5&warning=%23ed7d31&light=%23eeeeee&h1-font-size=2rem&h2-font-size=1.5rem&h3-font-size=1.2rem";
+@import "ui/bootstraptheme.css?primary=%235b9bd5&warning=%23ed7d31&light=%23eeeeee&h1-font-size=2rem&h2-font-size=1.5rem&h3-font-size=1.2rem&enable-responsive-font-sizes=true";
 @import "ui/@fortawesome/fontawesome-free/css/all.min.css";
 @import "monokai.css?v=2";
 
 /* Heading color hierarchy */
-h1 { color: #5b9bd5; }
-h2 { color: #ed7d31; margin-top: 1.5rem; }
-h3 { color: #5c5c5c; margin-top: 1.5rem; }
+h1 { color: #5b9bd5; margin-top: 3rem; }
+h2 { color: #ed7d31; margin-top: 3rem; }
+h3 { color: #5c5c5c; margin-top: 3rem; }
+.content h1:first-child { margin-top: 0; }
 
 /* Tables should have borders */
 table thead th { border-bottom: 1px solid #000; }

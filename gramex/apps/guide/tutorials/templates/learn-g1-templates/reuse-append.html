@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>g1 templates</title>
+</head>
+<body>
+
+  <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lodash"></script>
+  <script src="https://cdn.jsdelivr.net/npm/g1"></script>
+
+  <!-- BEGIN -->
+  <script type="text/html" class="append" data-append="true">
+    <div><%= n %> x <%= n %> = <%= n * n %></div>
+  </script>
+  <script>
+    $('.append').template({ n: 1 })
+    $('.append').template({ n: 5 })
+    $('.append').template({ n: 10 })
+  </script>
+  <!-- END -->
+
+</body>
+</html>

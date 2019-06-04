@@ -961,9 +961,9 @@ fstream@^1.0.0, fstream@^1.0.12:
     rimraf "2"
 
 g1@0.17:
-  version "0.17.0"
-  resolved "https://registry.yarnpkg.com/g1/-/g1-0.17.0.tgz#b0387b7259be5372a3f7d152d235c0c833418649"
-  integrity sha512-BPJwgDo2CUJWlqXbsW1ZObBPuC8k37faVyOAjOIZInFLsraLx+Q6XyteRez6h+69m9Rx1a7ZntAPeTWtC9NfQQ==
+  version "0.17.1"
+  resolved "https://registry.yarnpkg.com/g1/-/g1-0.17.1.tgz#b03b860649e5b6648ccb87374b9b0d048f610ec9"
+  integrity sha512-yzROjHrYSzzj7BaR5Owufrn3KgJ49d74s/Lxz/6aXuKnUbfNyqHHQa5HOYBhz3npHPjPgI5PLauDgwMuD2Uw0A==
 
 gauge@~2.7.3:
   version "2.7.4"

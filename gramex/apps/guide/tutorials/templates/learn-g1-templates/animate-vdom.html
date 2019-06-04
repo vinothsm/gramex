@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>g1 templates</title>
+</head>
+<body>
+
+  <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lodash"></script>
+  <!-- TODO: replace with jsdelivr.net once g1 upgrades beyond 0.17.0 -->
+  <script src="../../../ui/g1/dist/g1.min.js"></script>
+
+  <!-- BEGIN -->
+  <script src="https://cdn.jsdelivr.net/npm/morphdom/dist/morphdom-umd.min.js"></script>
+  <style>
+    circle { transition: all 1s ease; }
+  </style>
+  <script type="text/html" data-engine="vdom" class="bouncing-ball">
+    <svg width="500" height="50">
+      <circle cx="<%= x %>" cy="<%= y %>" r="5" fill="red"></circle>
+    </svg>
+  </script>
+  <script>
+    // Update the template every 1 second to animate
+    setInterval(function() {
+      $('.bouncing-ball').template({
+        x: Math.random() * 500,
+        y: Math.random() * 50
+      })
+    }, 1000)
+  </script>
+  <!-- END -->
+
+</body>
+</html>

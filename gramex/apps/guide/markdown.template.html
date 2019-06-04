@@ -27,7 +27,12 @@
     </a>
   </nav>
 
-  <div class="container d-flex py-3 ml-3">
+  <script src="/{{ GUIDE_ROOT }}/ui/jquery/dist/jquery.min.js"></script>
+  <script src="/{{ GUIDE_ROOT }}/ui/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/{{ GUIDE_ROOT }}/ui/lodash/lodash.min.js"></script>
+  <script src="/{{ GUIDE_ROOT }}/ui/g1/dist/g1.min.js"></script>
+
+  <div class="container d-flex py-3">
     <nav class="menu collapse pr-3 h-full">
       <ul class="p-0">
         <li><a href="/{{ GUIDE_ROOT }}/search/">Index of topics</a></li>
@@ -104,11 +109,6 @@
       </ul>
     </nav>
 
-    <script src="/{{ GUIDE_ROOT }}/ui/jquery/dist/jquery.min.js"></script>
-    <script src="/{{ GUIDE_ROOT }}/ui/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/{{ GUIDE_ROOT }}/ui/lodash/lodash.min.js"></script>
-    <script src="/{{ GUIDE_ROOT }}/ui/g1/dist/g1.min.js"></script>
-
     <section class="content">
       {% if title %}
         <h1>{{ title }}</h1>
@@ -119,7 +119,7 @@
 
   <script src="/{{ GUIDE_ROOT }}/node_modules/clipboard/dist/clipboard.min.js"></script>
   <script src="/{{ GUIDE_ROOT }}/node_modules/anchor-js/anchor.min.js"></script>
-  <script src="/{{ GUIDE_ROOT }}/script.js?v=44"></script>
+  <script src="/{{ GUIDE_ROOT }}/script.js"></script>
   <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.6/highlight.min.js"></script>	  <script src="/{{ GUIDE_ROOT }}/node_modules/prismjs/prism.js"></script>
   <script charset="UTF-8" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/yaml.min.js"></script>
   <script>hljs.initHighlightingOnLoad();</script>

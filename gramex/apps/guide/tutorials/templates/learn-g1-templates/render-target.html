@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>g1 templates</title>
+</head>
+<body>
+
+  <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lodash"></script>
+  <script src="https://cdn.jsdelivr.net/npm/g1"></script>
+
+  <!-- BEGIN -->
+  <script type="text/html" class="target" data-target="div.target" data-append="true">
+    This text from the template is rendered inside the target element, though it was written above it.
+  </script>
+  <p>This text is written below the template, but will appear first.</p>
+  <div class="target">This is the target element. </div>
+  <script>
+    $('script.target').template()
+  </script>
+  <!-- END -->
+
+</body>
+</html>

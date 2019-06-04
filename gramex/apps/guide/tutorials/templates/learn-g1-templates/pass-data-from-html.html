@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>g1 templates</title>
+</head>
+<body>
+
+  <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lodash"></script>
+  <!-- TODO: replace with jsdelivr.net once g1 upgrades beyond 0.17.0 -->
+  <script src="../../../ui/g1/dist/g1.min.js"></script>
+
+  <!-- BEGIN -->
+  <script type="text/html" class="data-html" data-x="1" data-y="['a', 'b']">
+    data-x = <%= $data.x %>,
+    data-y = <%= JSON.stringify($data.y) %>,
+    class = <%= $node.attr('class') %>,
+    type = <%= $node.attr('type') %>
+  </script>
+  <script>
+    $('.data-html').template()
+  </script>
+  <!-- END -->
+
+</body>
+</html>

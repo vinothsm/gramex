@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>g1 templates</title>
+</head>
+<body>
+
+  <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lodash"></script>
+  <script src="https://cdn.jsdelivr.net/npm/g1"></script>
+
+  <!-- BEGIN -->
+  <script type="text/html" class="data-js">
+    x = <%= x %>,                 <!-- "x" must be passed to this template -->
+    y = <%= JSON.stringify(y) %>  <!-- "y" must also be passed -->
+  </script>
+  <script>
+    $('.data-js').template({
+      x: 1,           // The template can use the variable "x"
+      y: ["a", "b"]   // The template can use the variable "y"
+    })
+  </script>
+  <!-- END -->
+
+</body>
+</html>

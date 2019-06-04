@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>IMDb Story</title>
+</head>
+
+<body>
+
+  <script src="https://cdn.jsdelivr.net/npm/jquery"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lodash"></script>
+  <script src="https://cdn.jsdelivr.net/npm/g1"></script>
+
+  <!-- BEGIN -->
+  <script type="text/html">
+    <svg width="800" height="600" class="w-100">
+      <% _.each(data, function (title) { %>
+        <circle
+          cx="<%= 250 * Math.log10(title.v / 10000) %>"
+          cy="<%= 600 * (1 - title.r / 10) %>"
+          r="5"
+          fill="rgba(0,0,0,0.1)">
+            <title><%- title.n %></title>
+      </circle>
+      <% }) %>
+    </svg>
+  </script>
+  <!-- END -->
+
+  <script>
+    $.getJSON('movies.json')
+      .done(function (data) {
+        $('body').template({ data: data })
+      })
+  </script>
+
+</body>
+
+</html>
