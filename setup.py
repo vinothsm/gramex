@@ -15,7 +15,6 @@ import os
 # (conda): packages is part of Anaconda, not Miniconda
 install_requires = [
     # Requires conda install
-    'sklearn',                      # OPT: (conda) For gramex.ml
     'argh >= 0.24.1',               # REQ: dependency for watchdog
     'boto3 >= 1.5',                 # SRV: Amazon services
     'cachetools >= 3.0.0',          # SRV: services.cache for memory cache
@@ -25,6 +24,7 @@ install_requires = [
     'crontab >= 0.21',              # SRV: services.schedule to parse crontab entries
     'cssselect',                    # OPT: pytest gramex plugin
     'diskcache >= 2.8.3',           # SRV: services.cache for disk cache
+    'python-dateutil==2.8.0',          # For schedule testing
     'ipdb',                         # OPT: gramex.debug
     'jmespath',                     # OPT: pytest gramex plugin
     'joblib',                       # OPT: For gramex.ml
@@ -42,6 +42,7 @@ install_requires = [
     'seaborn',                      # OPT: (conda) gramex.data.download()
     'setuptools >= 16.0',           # REQ: 16.0 has good error message support
     'six',                          # REQ: Python 3 compatibility
+    'shutilwhich >= 1.1.0',         # REQ: shutil.which backport
     'sqlalchemy',                   # REQ: (conda) gramex.data.filter()
     'sqlitedict >= 1.5.0',          # SRV: SQLiteStore
     'tornado == 5.1.1',             # REQ: Web server
@@ -183,7 +184,6 @@ setup(
     tests_require=[
         'nose',
         'coverage',
-        'python-dateutil',          # For schedule testing
         'testfixtures',             # For logcapture
         'sphinx_rtd_theme',         # For documentation
         'websocket-client',         # For websocket testing
@@ -205,8 +205,8 @@ setup(
         'python-pptx >= 0.6.6',         # SRV: pptgen
         'redis >= 2.10.0',              # SRV: RedisStore
         'selenium',                     # OPT: pytest gramex plugin
-        'shutilwhich >= 1.1.0',         # REQ: shutil.which backport
         'xlrd',                         # REQ: (conda) gramex.data.download()
+        'sklearn'                       # OPT: (conda) for gramex.ml
     ],
     cmdclass={
         'develop': PostDevelopCommand,

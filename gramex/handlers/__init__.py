@@ -1,7 +1,7 @@
 '''
 Handlers
 '''
-
+from ..config import app_log
 from .basehandler import BaseHandler, BaseWebSocketHandler, SetupFailedHandler
 from .functionhandler import FunctionHandler
 from .websockethandler import WebSocketHandler
@@ -11,7 +11,10 @@ from .processhandler import ProcessHandler
 from .jsonhandler import JSONHandler
 from .socialhandler import TwitterRESTHandler, FacebookGraphHandler
 from .uploadhandler import UploadHandler
-from .capturehandler import CaptureHandler, Capture
+try:
+    from .capturehandler import CaptureHandler, Capture
+except ModuleNotFoundError:
+    app_log.error('CaptureHandler needs psutil.')
 from .formhandler import FormHandler
 from .pptxhandler import PPTXHandler
 from .proxyhandler import ProxyHandler
