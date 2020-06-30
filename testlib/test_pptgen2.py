@@ -210,11 +210,12 @@ class TestPPTGen(TestCase):
 
     def test_slide_filter(self, slides=[1, 2, 3]):
         # Rules are specified as rule-name={shape: {rule}, ...}
+        data = {'x': [2, 3]}
         rule1 = {'slide-number': 1, 'Title 1': {'width': 10}}
-        rule2 = {'slide-number': [2, 3],
+        rule2 = {'slide-number': {'expr': 'x'},
                  'Title 1': {'width': 20},
                  'Rectangle 1': {'width': 20}}
-        prs = pptgen(source=self.input, only=slides, rules=[rule1, rule2])
+        prs = pptgen(source=self.input, only=slides, data=data, rules=[rule1, rule2])
         eq_(self.get_shape(prs.slides[0].shapes, 'Title 1').width, pptx.util.Inches(10))
         eq_(self.get_shape(prs.slides[1].shapes, 'Title 1').width, pptx.util.Inches(20))
         eq_(self.get_shape(prs.slides[2].shapes, 'Title 1').width, pptx.util.Inches(20))
@@ -697,6 +698,9 @@ class TestPPTGen(TestCase):
         if isinstance(target, pptx.parts.slide.SlidePart):
             target = target.slide.shapes.title.text
         eq_(target, attr['target'])
+
+    def test_table(self, slides=9):
+        pass
 
     # TODO: if we delete slide 6 and use slides=[6, 7], this causes an error
     def test_copy_slide(self, slides=[7, 8]):

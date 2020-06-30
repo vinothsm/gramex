@@ -11,6 +11,7 @@ import io
 import matplotlib.cm
 import matplotlib.colors
 import os
+import pandas as pd
 import pptx
 import pptx.util
 import re
@@ -20,6 +21,7 @@ from functools import partial
 from gramex.config import objectpath
 from gramex.transforms import build_transform
 from lxml.html import fragments_fromstring, builder, HtmlElement
+from orderedattrdict import AttrDict
 from pptx.dml.color import RGBColor
 from pptx.dml.fill import FillFormat
 from pptx.enum.base import EnumValue
@@ -368,6 +370,14 @@ def strike(run, val, data):
     run.font._rPr.set('strike', val)
 
 
+def get_text_frame(shape):
+    # Get the text frame. Note: don't use .has_text_frame. This function should work for cells too
+    try:
+        return shape.text_frame
+    except AttributeError:
+        raise ValueError('Cannot set text on shape %s that has no text frame' % shape.name)
+
+
 para_attr_method = {
     'align': assign(alignment, 'alignment'),
     'bold': assign(binary, 'font', 'bold'),
@@ -401,11 +411,9 @@ def text(shape, spec, data):
     val = expr(spec, data)
     if val is None:
         return
-    if not shape.has_text_frame:
-        raise ValueError('Cannot add text to shape %s that has no text frame' % shape.name)
+    frame = get_text_frame(shape)
     # Delete all but the first para (required), and its first run (to preserve formatting).
     # All new paras and runs get the same formatting as the first para & run, by default
-    frame = shape.text_frame
     for p in frame.paragraphs[1:]:
         p._p.getparent().remove(p._p)
     for r in frame.paragraphs[0].runs[1:]:
@@ -439,8 +447,7 @@ def text(shape, spec, data):
 def replace(shape, spec, data):
     if not isinstance(spec, dict):
         raise ValueError('replace: needs a dict of {old: new} text, not %r' % spec)
-    if not shape.has_text_frame:
-        raise ValueError('Cannot add text to shape %s that has no text frame' % shape.name)
+    frame = get_text_frame(shape)
 
     def insert_run_after(r, p, original_r):
         new_r = copy.deepcopy(original_r)
@@ -448,7 +455,7 @@ def replace(shape, spec, data):
         return _Run(new_r, p)
 
     spec = {re.compile(old): fragments_fromstring(expr(new, data)) for old, new in spec.items()}
-    for p in shape.text_frame.paragraphs:
+    for p in frame.paragraphs:
         for r in p.runs:
             for old, tree in spec.items():
                 match = old.search(r.text)
@@ -473,12 +480,11 @@ def set_text(attr, on_para, shape, spec, data):
     '''Generator for bold, italic, color, and other text commands'''
     val = expr(spec, data)
     if val is not None:
-        if not shape.has_text_frame:
-            raise ValueError('Cannot change text of shape %s that has no text frame' % shape.name)
+        frame = get_text_frame(shape)
         # If on_para=True, set attr on every para, clear attr on every run (e.g. bold, italic)
         # Else, set attr on every run, clear attr on every para (e.g. color)
         para_method, run_method = para_attr_method[attr], run_attr_method[attr]
-        for para in shape.text_frame.paragraphs:
+        for para in frame.paragraphs:
             para_method(para, val if on_para else None, data)
             for run in para.runs:
                 run_method(run, None if on_para else val, data)
@@ -514,6 +520,95 @@ def image_height(shape, spec, data: dict):
     if val is not None:
         val = length(val)
         shape.width, shape.height = int(val * shape.width / shape.height), val
+
+
+# Table commands
+# ---------------------------------------------------------------------
+table_commands = {
+    'text': text,
+    'fill': partial(set_color, 'fill', 'fill'),
+    'fill-opacity': partial(set_opacity, 'fill-opacity', 'fill'),
+    # 'stroke': partial(set_color, 'stroke', 'line.fill'),
+    # 'stroke-opacity': partial(set_opacity, 'stroke-opacity', 'line.fill'),
+    # 'stroke-width': stroke_width,
+    # align: ...
+    # level: ...
+    # margin-left: 0.1 pt
+    # margin-right: 0.1 pt
+    # margin-top: 0.1 pt
+    # margin-bottom: 0.1 pt
+    # width:
+    'bold': partial(set_text, 'bold', True),
+    'color': partial(set_text, 'color', False),         # "False" to set color on runs not paras
+    'font-name': partial(set_text, 'font-name', True),
+    'font-size': partial(set_text, 'font-size', True),
+    'italic': partial(set_text, 'italic', True),
+    'underline': partial(set_text, 'underline', True),
+}
+
+
+def _resize(elements, n):
+    '''Ensure that a tr, tc or gridCol list has n children by cloning or deleting last element'''
+    for index in range(len(elements), n, -1):
+        elements[index - 1].delete()
+    for index in range(len(elements), n):
+        elements[-1].addnext(copy.deepcopy(elements[-1]))
+
+
+def table(shape, spec, data: dict):
+    if not shape.has_table:
+        raise ValueError('Cannot run table commands on shape %s that is not a table' % shape.name)
+    table = shape.table
+
+    # Set or get table first/last row/col attributes
+    shape.table.first_row = bool(expr(spec.get('header-row', shape.table.first_row), data))
+    shape.table.last_row = bool(expr(spec.get('total-row', shape.table.last_row), data))
+    shape.table.first_col = bool(expr(spec.get('first-column', shape.table.first_col), data))
+    shape.table.last_col = bool(expr(spec.get('last-column', shape.table.last_col), data))
+
+    # table data must be a DataFrame if specified. Else, create a DataFrame from existing text
+    table_data = expr(spec.get('data', None), data)
+    if table_data is not None and not isinstance(table_data, pd.DataFrame):
+        raise ValueError('data on table %s must be a DataFrame, not %r' % (shape.name, table_data))
+    # Extract data from table text if no data is specified.
+    if table_data is None:
+        table_data = pd.DataFrame([[cell.text for cell in row.cells] for row in shape.table.rows])
+        # If the PPTX table has a header row, set the first row as the DataFrame header too
+        if shape.table.first_row:
+            table_data = table_data.T.set_index([0]).T
+
+    # Adjust PPTX table size to data table size
+    header_offset = 1 if shape.table.first_row else 0
+    _resize(table._tbl.tr_lst, len(table_data) + header_offset)
+    data_cols = len(table_data.columns)
+    _resize(table._tbl.tblGrid.gridCol_lst, data_cols)
+    for row in table.rows:
+        _resize(row._tr.tc_lst, data_cols)
+
+    # Set header row text. No data-driven formatting can be applied on header rows
+    if shape.table.first_row:
+        for j, column in enumerate(table_data.columns):
+            table.cell(0, j).text = column
+
+    # TODO: Handle nans
+    # Apply table commands. (Copy data to avoid modifying original. We'll add data['cell'] later)
+    data = dict(data)
+    for key, cspec in spec.items():
+        cmd = table_commands.get(key, None)
+        if cmd is None:
+            continue
+        for i, (index, row) in enumerate(table_data.iterrows()):
+            for j, (column, val) in enumerate(row.iteritems()):
+                data['cell'] = AttrDict(
+                    val=val, column=column, index=index, row=row, data=table_data,
+                    pos=AttrDict(row=i, column=j))
+                cell = table.cell(i + header_offset, j)
+                val = expr(cspec, data)
+                if isinstance(val, dict):
+                    if column in val:
+                        cmd(cell, val[column], data)
+                else:
+                    cmd(cell, val, data)
 
 
 cmdlist = {
@@ -564,8 +659,8 @@ cmdlist = {
     'italic': partial(set_text, 'italic', True),
     'underline': partial(set_text, 'underline', True),
     # Others
+    'table': table,
     # 'chart': chart,
-    # 'table': table,
     # Custom charts
     # 'sankey': sankey,
     # 'bullet': bullet,
