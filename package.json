@@ -1,6 +1,9 @@
 {
   "devDependencies": {
+    "eclint": "2",
+    "eslint": "7",
     "eslint-plugin-html": "6",
-    "eslint-plugin-template": "0.4"
+    "eslint-plugin-template": "0.4",
+    "htmllint-cli": "0.0.7"
   }
 }
