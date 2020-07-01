@@ -15,7 +15,6 @@ help:
 	@echo "lint - check style with flake8, eclint, eslint, htmllint, bandit"
 	@echo "docs - generate Sphinx HTML documentation, including API docs"
 	@echo "release - package and upload a release"
-	@echo "dist - package"
 	@echo "clean - remove all build, test, coverage and Python artifacts"
 	@echo "clean-build - remove build artifacts"
 	@echo "clean-pyc - remove Python file artifacts"
@@ -60,8 +59,11 @@ lint:
 	bandit gramex --recursive --format csv || true    # Just run bandit as a warning
 
 test:
-	pip install nose
+	pip install nose nose-timer coverage
 	$(PYTHON) setup.py nosetests
+	# TODO: If we're on Travis and this is the master branch, rsync into learn.gramener.com/guide/coverage/<version>
+	# TODO: Link to the coverage from the release notes
+	# TODO: learn.gramener.com/guide/coverage/ should show the code coverage by release, and the reason
 
 release-test: clean-test lint docs test
 
@@ -70,15 +72,24 @@ docs:
 	sphinx-apidoc -o docs/ gramex --no-toc
 	$(MAKE) -C docs clean
 	$(MAKE) -C docs html
+	# TODO: Push to readthedocs AND the guide
 
 release: clean
 	$(PYTHON) setup.py sdist
 	$(PYTHON) setup.py bdist_wheel
 
-dist: clean release
-	ls -l dist
+# TODO: Conda build
+release-conda: release
+
+# TODO: Docker build
+release-docker: release
+	docker build pkg/docker-py3 -t gramener/gramex:$VERSION
+	docker tag gramener/gramex:$VERSION gramener/gramex:latest
+	docker login                # log in as sanand0 / pratapvardhan
+	docker push gramener/gramex
 
 stats:
+	# TODO: combine python and python setup
 	@echo python
 	@find gramex -path '*node_modules/*' -prune -o -name '*.py' | grep '\.py$$' | xargs wc -l | tail -1
 	@echo python setup
@@ -94,7 +105,13 @@ push-coverage:
 push-docs: docs
 	rsync -avzP docs/_build/html/ ubuntu@gramener.com:/mnt/gramener/learn.gramener.com/gramex/
 
-push-pypi: clean
-	python setup.py sdist
+push-pypi: release
 	# Note: if this fails, add '-p PASSWORD'
 	twine upload -u gramener dist/*
+
+push-docker: release-docer
+
+push-conda: release-conda
+
+# TODO
+# 	- Auto-generate the basis of a change log

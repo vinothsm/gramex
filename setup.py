@@ -6,6 +6,7 @@ import json
 import os
 
 # Libraries required for Gramex
+# TODO: Move this into requirement.txt
 # Keep this in sync with guide/license/thirdparty.md
 # REQ: required packages for Gramex
 # OPT: optional packages not required for startup, but "batteries included"
@@ -135,6 +136,7 @@ setup(
     # Read: http://stackoverflow.com/a/2969087/100904
     # package_data includes data files for binary & source distributions
     # include_package_data is only for source distributions, uses MANIFEST.in
+    # TODO: should we eliminate bdist_wheel, just use sdist
     package_data={
         'gramex': gramex_files,
     },
@@ -147,9 +149,6 @@ setup(
     },
     test_suite='tests',
     tests_require=[
-        'nose',
-        'nose-timer',
-        'coverage',
         'python-dateutil',          # For schedule testing
         'testfixtures',             # For logcapture
         'sphinx_rtd_theme',         # For documentation
