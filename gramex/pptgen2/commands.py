@@ -121,7 +121,7 @@ def fill_color(fill: FillFormat, val: Union[str, tuple, list, None]) -> None:
 
     - a named color, like ``black``
     - a hex value, like ``#f80`` or ``#ff8800``
-    - an RGB value, like ``rgb(255, 255, 0)``
+    - an RGB value, like ``rgb(255, 255, 0)`` or ``rgb(1, 0.5, 0.1)``
     - a tuple or list of RGB values, like ``(255, 255, 0)`` or ``[255, 255, 0]``
     - a theme color, like ``ACCENT_1``, ``ACCENT_2``, ``BACKGROUND_1``, ``DARK_1``, ``LIGHT_2``
     - a theme color with a brightness modifier, like ``ACCENT_1+40``, which is 40% brighter than
@@ -132,7 +132,11 @@ def fill_color(fill: FillFormat, val: Union[str, tuple, list, None]) -> None:
     if val == 'none':
         fill.background()
     elif isinstance(val, (list, tuple)):
-        fill.fore_color.rgb = RGBColor(*val[:3])
+        val = val[:3]
+        if any(isinstance(v, float) for v in val) and all(0 <= v <= 1 for v in val):
+            fill.fore_color.rgb = RGBColor(*(int(v * 256 if v < 1 else 255) for v in val))  # noqa
+        else:
+            fill.fore_color.rgb = RGBColor(*val)
     elif isinstance(val, str):
         val = color_map.get(val, val).upper()
         if val.startswith('#'):
@@ -335,22 +339,41 @@ def set_tooltip(type, prs, slide, shape, val):
 
 # Text commands
 # ---------------------------------------------------------------------
+def _ws(text):
+    return re.sub(r'\s+', ' ', text, re.DOTALL)
+
+
 def get_elements(children: List[Union[str, HtmlElement]], element_builder):
     '''
     Convert head & tail text into specified tag, so that we can just process all text and elements
     as a single list.
     '''
+    elements, open = [], True
     for e in children:
-        if isinstance(e, HtmlElement):
-            tail = e.tail.rstrip() if e.tail else e.tail
-            if e.text or list(e):
-                e.tail = ''
-                yield e if e.tag == element_builder.args[0] else element_builder(e)
-            if tail:
-                yield element_builder(tail)
-        elif isinstance(e, str):
+        if isinstance(e, str):
+            e = re.sub(r'\s+', ' ', e, re.DOTALL)
             if e:
-                yield element_builder(e.rstrip())
+                if open and len(elements):
+                    elements[-1].text += e
+                else:
+                    elements.append(element_builder(e))
+            open = True
+        elif isinstance(e, HtmlElement):
+            if e.tag != element_builder.args[0]:
+                if open and len(elements):
+                    elements[-1].append(e)
+                else:
+                    elements.append(element_builder(e))
+                open = True
+            else:
+                elements.append(e)
+                open = False
+                tail = re.sub(r'\s+', ' ', e.tail, re.DOTALL) if e.tail else ''
+                if tail.strip():
+                    elements.append(element_builder(tail))
+                    open = True
+
+    return elements
 
 
 def baseline(run, val, data):
@@ -378,7 +401,7 @@ def get_text_frame(shape):
         raise ValueError('Cannot set text on shape %s that has no text frame' % shape.name)
 
 
-para_attr_method = {
+para_methods = {
     'align': assign(alignment, 'alignment'),
     'bold': assign(binary, 'font', 'bold'),
     'color': lambda p, v, d: fill_color(p.font.fill, v),
@@ -391,7 +414,7 @@ para_attr_method = {
     'space-before': assign(length, 'space_before'),
     'underline': assign(binary, 'font', 'underline'),
 }
-run_attr_method = {
+run_methods = {
     'baseline': baseline,
     'bold': assign(binary, 'font', 'bold'),
     'color': lambda r, v, d: fill_color(r.font.fill, v),
@@ -430,8 +453,8 @@ def text(shape, spec, data):
         p._pPr.attrib.update(para_defaults)
         # Set specified para attributes
         for attr, val in para.attrib.items():
-            if attr in para_attr_method:
-                para_attr_method[attr](p, val, data)
+            if attr in para_methods:
+                para_methods[attr](p, val, data)
         for j, run in enumerate(get_elements([para.text] + list(para), builder.A)):
             # The first run MAY exist, if there was text. Or not. Create if required
             r = p.add_run() if j >= len(p.runs) else p.runs[j]
@@ -440,8 +463,8 @@ def text(shape, spec, data):
             # Set specified run attributes
             r.text = run.text
             for attr, val in run.attrib.items():
-                if attr in run_attr_method:
-                    run_attr_method[attr](r, val, data)
+                if attr in run_methods:
+                    run_methods[attr](r, val, data)
 
 
 def replace(shape, spec, data):
@@ -468,26 +491,27 @@ def replace(shape, spec, data):
                         r = insert_run_after(r, p, original_r) if j > 0 else r
                         r.text = run.text
                         for attr, val in run.attrib.items():
-                            if attr in run_attr_method:
-                                run_attr_method[attr](r, val, data)
+                            if attr in run_methods:
+                                run_methods[attr](r, val, data)
                     if suffix:
                         # Ensure suffix has same attrs as original text
                         r = insert_run_after(r, p, original_r)
                         r.text = suffix
 
 
-def set_text(attr, on_para, shape, spec, data):
+def set_text(attr, on_run, shape, spec, data):
     '''Generator for bold, italic, color, and other text commands'''
     val = expr(spec, data)
     if val is not None:
         frame = get_text_frame(shape)
-        # If on_para=True, set attr on every para, clear attr on every run (e.g. bold, italic)
-        # Else, set attr on every run, clear attr on every para (e.g. color)
-        para_method, run_method = para_attr_method[attr], run_attr_method[attr]
+        para_method, run_method = para_methods[attr], run_methods[attr]
         for para in frame.paragraphs:
-            para_method(para, val if on_para else None, data)
+            para_method(para, val, data)
             for run in para.runs:
-                run_method(run, None if on_para else val, data)
+                # If on_run=False, clear attr on every run (e.g. bold, italic)
+                # Else, set attr on every run too (e.g. color)
+                # (because PPT doesn't display use color on para.)
+                run_method(run, val if on_run else None, data)
 
 
 # Image commands
@@ -498,6 +522,7 @@ def image(shape, spec, data: dict):
     if val is not None:
         rid = shape._pic.blipFill.blip.rEmbed
         part = shape.part.related_parts[rid]
+        # TODO: This REPLACES the image. We must CREATE an image. Else cloning images fails
         if urlparse(val).netloc:
             part._blob = requests.get(val).content
         else:
@@ -538,12 +563,12 @@ table_commands = {
     # margin-top: 0.1 pt
     # margin-bottom: 0.1 pt
     # width:
-    'bold': partial(set_text, 'bold', True),
-    'color': partial(set_text, 'color', False),         # "False" to set color on runs not paras
-    'font-name': partial(set_text, 'font-name', True),
-    'font-size': partial(set_text, 'font-size', True),
-    'italic': partial(set_text, 'italic', True),
-    'underline': partial(set_text, 'underline', True),
+    'bold': partial(set_text, 'bold', False),
+    'color': partial(set_text, 'color', True),     # PPT needs colors on runs too, not only paras
+    'font-name': partial(set_text, 'font-name', False),
+    'font-size': partial(set_text, 'font-size', False),
+    'italic': partial(set_text, 'italic', False),
+    'underline': partial(set_text, 'underline', False),
 }
 
 
@@ -561,10 +586,10 @@ def table(shape, spec, data: dict):
     table = shape.table
 
     # Set or get table first/last row/col attributes
-    shape.table.first_row = bool(expr(spec.get('header-row', shape.table.first_row), data))
-    shape.table.last_row = bool(expr(spec.get('total-row', shape.table.last_row), data))
-    shape.table.first_col = bool(expr(spec.get('first-column', shape.table.first_col), data))
-    shape.table.last_col = bool(expr(spec.get('last-column', shape.table.last_col), data))
+    table.first_row = bool(expr(spec.get('header-row', table.first_row), data))
+    table.last_row = bool(expr(spec.get('total-row', table.last_row), data))
+    table.first_col = bool(expr(spec.get('first-column', table.first_col), data))
+    table.last_col = bool(expr(spec.get('last-column', table.last_col), data))
 
     # table data must be a DataFrame if specified. Else, create a DataFrame from existing text
     table_data = expr(spec.get('data', None), data)
@@ -572,13 +597,13 @@ def table(shape, spec, data: dict):
         raise ValueError('data on table %s must be a DataFrame, not %r' % (shape.name, table_data))
     # Extract data from table text if no data is specified.
     if table_data is None:
-        table_data = pd.DataFrame([[cell.text for cell in row.cells] for row in shape.table.rows])
+        table_data = pd.DataFrame([[cell.text for cell in row.cells] for row in table.rows])
         # If the PPTX table has a header row, set the first row as the DataFrame header too
-        if shape.table.first_row:
+        if table.first_row:
             table_data = table_data.T.set_index([0]).T
 
     # Adjust PPTX table size to data table size
-    header_offset = 1 if shape.table.first_row else 0
+    header_offset = 1 if table.first_row else 0
     _resize(table._tbl.tr_lst, len(table_data) + header_offset)
     data_cols = len(table_data.columns)
     _resize(table._tbl.tblGrid.gridCol_lst, data_cols)
@@ -586,7 +611,7 @@ def table(shape, spec, data: dict):
         _resize(row._tr.tc_lst, data_cols)
 
     # Set header row text. No data-driven formatting can be applied on header rows
-    if shape.table.first_row:
+    if table.first_row:
         for j, column in enumerate(table_data.columns):
             table.cell(0, j).text = column
 
@@ -652,12 +677,12 @@ cmdlist = {
     # Text
     'replace': replace,
     'text': text,
-    'bold': partial(set_text, 'bold', True),
-    'color': partial(set_text, 'color', False),         # "False" to set color on runs not paras
-    'font-name': partial(set_text, 'font-name', True),
-    'font-size': partial(set_text, 'font-size', True),
-    'italic': partial(set_text, 'italic', True),
-    'underline': partial(set_text, 'underline', True),
+    'bold': partial(set_text, 'bold', False),
+    'color': partial(set_text, 'color', True),  # PPT needs colors on runs too, not only paras
+    'font-name': partial(set_text, 'font-name', False),
+    'font-size': partial(set_text, 'font-size', False),
+    'italic': partial(set_text, 'italic', False),
+    'underline': partial(set_text, 'underline', False),
     # Others
     'table': table,
     # 'chart': chart,
