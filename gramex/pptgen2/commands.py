@@ -256,14 +256,14 @@ def zoom(shape, spec, data: dict):
         shape.height = int(shape.height * val)
 
 
-def set_color(prop, attr, shape, spec, data: dict):
+def set_color(attr, shape, spec, data: dict):
     '''Generator for fill, stroke commands'''
     val = expr(spec, data)
     if val is not None:
         fill_color(objectpath(shape, attr), val)
 
 
-def set_opacity(prop, attr, shape, spec, data: dict):
+def set_opacity(attr, shape, spec, data: dict):
     '''Generator for fill-opacity, stroke-opacity commands'''
     val = expr(spec, data)
     if val is not None:
@@ -551,10 +551,10 @@ def image_height(shape, spec, data: dict):
 # ---------------------------------------------------------------------
 table_commands = {
     'text': text,
-    'fill': partial(set_color, 'fill', 'fill'),
-    'fill-opacity': partial(set_opacity, 'fill-opacity', 'fill'),
-    # 'stroke': partial(set_color, 'stroke', 'line.fill'),
-    # 'stroke-opacity': partial(set_opacity, 'stroke-opacity', 'line.fill'),
+    'fill': partial(set_color, 'fill'),
+    'fill-opacity': partial(set_opacity, 'fill'),
+    # 'stroke': partial(set_color, 'line.fill'),
+    # 'stroke-opacity': partial(set_opacity, 'line.fill'),
     # 'stroke-width': stroke_width,
     # align: ...
     # level: ...
@@ -622,6 +622,9 @@ def table(shape, spec, data: dict):
         cmd = table_commands.get(key, None)
         if cmd is None:
             continue
+        # The command spec can be an expression, or a dict of columns.
+        #   fill: {sales: 'red'} -- treat as a dict of columns (fill sales column red)
+        #   fill: {value: 'red'} -- treat as a single expression (fill ALL columns red)
         for i, (index, row) in enumerate(table_data.iterrows()):
             for j, (column, val) in enumerate(row.iteritems()):
                 data['cell'] = AttrDict(
@@ -658,10 +661,10 @@ cmdlist = {
     'adjustment3': partial(set_adjustment, 2),
     'adjustment4': partial(set_adjustment, 3),
     # Style
-    'fill': partial(set_color, 'fill', 'fill'),
-    'stroke': partial(set_color, 'stroke', 'line.fill'),
-    'fill-opacity': partial(set_opacity, 'fill-opacity', 'fill'),
-    'stroke-opacity': partial(set_opacity, 'stroke-opacity', 'line.fill'),
+    'fill': partial(set_color, 'fill'),
+    'stroke': partial(set_color, 'line.fill'),
+    'fill-opacity': partial(set_opacity, 'fill'),
+    'stroke-opacity': partial(set_opacity, 'line.fill'),
     'stroke-width': stroke_width,
     # Image
     'image': image,
