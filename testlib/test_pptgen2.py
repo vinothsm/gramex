@@ -695,6 +695,19 @@ class TestPPTGen(TestCase):
 
     def test_table(self, slides=9):
         data = self.data.head(10)       # The 10th row has NaNs. Ensure the row is included
+        prs = pptgen(source=self.input, target=self.output, only=slides, mode='expr',
+                     data={'data': data},
+                     rules=[
+                         {'Table 1': {'table': {'data': 'data'}}},
+                         {'Table 2': {'table': {'data': 'data'}}},
+                     ])
+        for row_offset, shape_name in ((1, 'Table 1'), (0, 'Table 2')):
+            table = self.get_shape(prs.slides[0].shapes, shape_name).table
+            for i, (index, row) in enumerate(data.iterrows()):
+                for j, (column, val) in enumerate(row.iteritems()):
+                    cell = table.rows[i + row_offset].cells[j]
+                    eq_(cell.text, '{}'.format(val))
+
         cmds = {'table': {
             'data': data,
             'header-row': False,

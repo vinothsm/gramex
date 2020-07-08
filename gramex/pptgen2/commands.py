@@ -615,28 +615,32 @@ def table(shape, spec, data: dict):
         for j, column in enumerate(table_data.columns):
             table.cell(0, j).text = column
 
+    # If `text` is not specified, just use the table value
+    expr_mode = data.get('_expr_mode')
+    spec.setdefault('text', 'cell.val' if expr_mode else {'expr': 'cell.val'})
+
     # TODO: Handle nans
     # Apply table commands. (Copy data to avoid modifying original. We'll add data['cell'] later)
     data = dict(data)
-    for key, cspec in spec.items():
+    for key, cmdspec in spec.items():
         cmd = table_commands.get(key, None)
         if cmd is None:
             continue
-        # The command spec can be an expression, or a dict of columns.
-        #   fill: {sales: 'red'} -- treat as a dict of columns (fill sales column red)
-        #   fill: {value: 'red'} -- treat as a single expression (fill ALL columns red)
+        # The command spec can be an expression, or a dict of expressions for each column.
+        # Always convert into a {column: expression}.
+        # But carefully, handling {value: ...} in expr mode and {expr: ...} in literal mode
+        if (not isinstance(cmdspec, dict) or
+                (expr_mode and 'value' in cmdspec) or
+                (not expr_mode and 'expr' in cmdspec)):
+            cmdspec = {column: cmdspec for column in table_data.columns}
         for i, (index, row) in enumerate(table_data.iterrows()):
             for j, (column, val) in enumerate(row.iteritems()):
                 data['cell'] = AttrDict(
                     val=val, column=column, index=index, row=row, data=table_data,
                     pos=AttrDict(row=i, column=j))
                 cell = table.cell(i + header_offset, j)
-                val = expr(cspec, data)
-                if isinstance(val, dict):
-                    if column in val:
-                        cmd(cell, val[column], data)
-                else:
-                    cmd(cell, val, data)
+                if column in cmdspec:
+                    cmd(cell, cmdspec[column], data)
 
 
 cmdlist = {
