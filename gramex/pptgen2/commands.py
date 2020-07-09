@@ -26,7 +26,7 @@ from pptx.dml.color import RGBColor
 from pptx.dml.fill import FillFormat
 from pptx.enum.base import EnumValue
 from pptx.enum.dml import MSO_THEME_COLOR, MSO_FILL
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.text import PP_ALIGN, MSO_VERTICAL_ANCHOR
 from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 from pptx.oxml.ns import _nsmap, qn
 from pptx.oxml.simpletypes import ST_Percentage
@@ -58,13 +58,16 @@ def expr(val, data: dict = {}):
     return val
 
 
-def assign(convert, *path: List[str]):
-    '''assign(int, 'font', 'size') returns a method(para, '10') -> para.font.size = int(10)'''
+def assign(convert, path: str):
+    '''assign(int, 'font.3.size') returns a method(para, '10') -> para.font[3].size = int(10)'''
+    path = path.split('.')
+
     def method(node, value, data):
         for p in path[:-1]:
-            node = getattr(node, p)
+            node = node[int(p)] if p.isdigit() else getattr(node, p)
         # To clear the bold, italic, etc, we need to set it to None. So don't convert None
         setattr(node, path[-1], None if value is None else convert(value))
+
     return method
 
 
@@ -185,9 +188,9 @@ def binary(val: Union[str, int, float]) -> bool:
     raise ValueError('Invalid boolean: %r' % val)
 
 
-def alignment(val: str) -> EnumValue:
-    '''Convert string to alignment value'''
-    alignment = getattr(PP_ALIGN, val.upper(), None)
+def alignment(enum, val: str) -> EnumValue:
+    '''Convert string to alignment value. enum can be PP_ALIGN or MSO_VERTICAL_ANCHOR'''
+    alignment = getattr(enum, val.upper(), None)
     if alignment is not None:
         return alignment
     raise ValueError('Invalid alignment: %s' % val)
@@ -339,10 +342,6 @@ def set_tooltip(type, prs, slide, shape, val):
 
 # Text commands
 # ---------------------------------------------------------------------
-def _ws(text):
-    return re.sub(r'\s+', ' ', text, re.DOTALL)
-
-
 def get_elements(children: List[Union[str, HtmlElement]], element_builder):
     '''
     Convert head & tail text into specified tag, so that we can just process all text and elements
@@ -402,30 +401,30 @@ def get_text_frame(shape):
 
 
 para_methods = {
-    'align': assign(alignment, 'alignment'),
-    'bold': assign(binary, 'font', 'bold'),
+    'align': assign(partial(alignment, PP_ALIGN), 'alignment'),
+    'bold': assign(binary, 'font.bold'),
     'color': lambda p, v, d: fill_color(p.font.fill, v),
-    'font-name': assign(str, 'font', 'name'),
-    'font-size': assign(length, 'font', 'size'),
-    'italic': assign(binary, 'font', 'italic'),
+    'font-name': assign(str, 'font.name'),
+    'font-size': assign(length, 'font.size'),
+    'italic': assign(binary, 'font.italic'),
     'level': assign(int, 'level'),
     'line-spacing': assign(length, 'line_spacing'),
     'space-after': assign(length, 'space_after'),
     'space-before': assign(length, 'space_before'),
-    'underline': assign(binary, 'font', 'underline'),
+    'underline': assign(binary, 'font.underline'),
 }
 run_methods = {
     'baseline': baseline,
-    'bold': assign(binary, 'font', 'bold'),
+    'bold': assign(binary, 'font.bold'),
     'color': lambda r, v, d: fill_color(r.font.fill, v),
-    'font-name': assign(str, 'font', 'name'),
-    'font-size': assign(length, 'font', 'size'),
+    'font-name': assign(str, 'font.name'),
+    'font-size': assign(length, 'font.size'),
     'hover': lambda r, v, d: set_link('text', 'hlinkMouseOver', d['prs'], d['slide'], r, v),
-    'italic': assign(binary, 'font', 'italic'),
+    'italic': assign(binary, 'font.italic'),
     'link': lambda r, v, d: set_link('text', 'hlinkClick', d['prs'], d['slide'], r, v),
     'strike': strike,
     'tooltip': lambda r, v, d: set_tooltip('text', d['prs'], d['slide'], r, v),
-    'underline': assign(binary, 'font', 'underline'),
+    'underline': assign(binary, 'font.underline'),
 }
 
 
@@ -549,27 +548,18 @@ def image_height(shape, spec, data: dict):
 
 # Table commands
 # ---------------------------------------------------------------------
-table_commands = {
-    'text': text,
-    'fill': partial(set_color, 'fill'),
-    'fill-opacity': partial(set_opacity, 'fill'),
-    # 'stroke': partial(set_color, 'line.fill'),
-    # 'stroke-opacity': partial(set_opacity, 'line.fill'),
-    # 'stroke-width': stroke_width,
-    # align: ...
-    # level: ...
-    # margin-left: 0.1 pt
-    # margin-right: 0.1 pt
-    # margin-top: 0.1 pt
-    # margin-bottom: 0.1 pt
-    # width:
-    'bold': partial(set_text, 'bold', False),
-    'color': partial(set_text, 'color', True),     # PPT needs colors on runs too, not only paras
-    'font-name': partial(set_text, 'font-name', False),
-    'font-size': partial(set_text, 'font-size', False),
-    'italic': partial(set_text, 'italic', False),
-    'underline': partial(set_text, 'underline', False),
-}
+def table_align(shape, spec, data: dict):
+    val = expr(spec, data)
+    if val is not None:
+        val = alignment(PP_ALIGN, val)
+        for para in shape.text_frame.paragraphs:
+            para.alignment = val
+
+
+def table_vertical_align(shape, spec, data: dict):
+    val = expr(spec, data)
+    if val is not None:
+        shape.vertical_anchor = alignment(MSO_VERTICAL_ANCHOR, val)
 
 
 def _resize(elements, n):
@@ -578,6 +568,30 @@ def _resize(elements, n):
         elements[index - 1].delete()
     for index in range(len(elements), n):
         elements[-1].addnext(copy.deepcopy(elements[-1]))
+
+
+table_commands = {
+    'text': text,
+    'fill': partial(set_color, 'fill'),
+    'fill-opacity': partial(set_opacity, 'fill'),
+    # 'stroke': partial(set_color, 'line.fill'),
+    # 'stroke-opacity': partial(set_opacity, 'line.fill'),
+    # 'stroke-width': stroke_width,
+    'align': table_align,
+    'vertical-align': table_vertical_align,
+    # level: ...
+    # margin-left: 0.1 pt
+    # margin-right: 0.1 pt
+    # margin-top: 0.1 pt
+    # margin-bottom: 0.1 pt
+    # width: column-wise width
+    'bold': partial(set_text, 'bold', False),
+    'color': partial(set_text, 'color', True),     # PPT needs colors on runs too, not only paras
+    'font-name': partial(set_text, 'font-name', False),
+    'font-size': partial(set_text, 'font-size', False),
+    'italic': partial(set_text, 'italic', False),
+    'underline': partial(set_text, 'underline', False),
+}
 
 
 def table(shape, spec, data: dict):

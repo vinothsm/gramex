@@ -11,7 +11,7 @@ from pandas.util.testing import assert_frame_equal as afe
 from pptx import Presentation
 from pptx.dml.color import _NoneColor
 from pptx.enum.dml import MSO_THEME_COLOR, MSO_FILL
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.text import PP_ALIGN, MSO_VERTICAL_ANCHOR as MVA
 from pptx.oxml.ns import _nsmap, qn
 from unittest import TestCase
 from . import folder, sales_file
@@ -714,6 +714,7 @@ class TestPPTGen(TestCase):
             'total-row': True,
             'first-column': True,
             'last-column': True,
+            'align': {'expr': '"left" if cell.pos.row % 2 else "right"'},
             'bold': {'expr': 'cell.pos.row % 2'},
             'color': {'expr': '"red" if cell.pos.row % 3 else "green"'},
             'fill': {'expr': '"#eee" if cell.pos.row % 2 else "#ccc"'},
@@ -725,6 +726,10 @@ class TestPPTGen(TestCase):
                 'city': {'expr': 'cell.pos.row % 2'},
             },
             'underline': {'expr': 'cell.pos.column % 2'},
+            'vertical-align': {
+                'देश': 'middle',
+                'city': {'expr': '"top" if cell.pos.row % 2 else "bottom"'},
+            },
             'text': '{cell.pos.row} {cell.pos.column} <a italic="y">{cell.index}</a> ' +
                     '{cell.column} {cell.val} {cell.row.size} {cell.data.size}',
         }}
@@ -769,6 +774,11 @@ class TestPPTGen(TestCase):
                         None)
                     eq_(paras[0].runs[1].font.italic, True)
                     eq_(paras[0].font.underline, bool(j % 2))
+                    eq_(paras[0].alignment, PP_ALIGN.LEFT if i % 2 else PP_ALIGN.RIGHT)
+                    eq_(cell.vertical_anchor,
+                        MVA.MIDDLE if column == 'देश' else
+                        (MVA.TOP if i % 2 else MVA.BOTTOM) if column == 'city' else
+                        None)
 
     # TODO: if we delete slide 6 and use slides=[6, 7], this causes an error
     def test_copy_slide(self, slides=[7, 8]):

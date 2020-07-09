@@ -122,6 +122,7 @@ gramex_files = [
     'favicon.ico',
     'release.json',
     'download.vega.js',
+    'pptgen2/config.yaml',
 ]
 gramex_files += list(recursive_include('gramex', 'handlers', ignore_patterns, ['*.html']))
 gramex_files += list(recursive_include('gramex', 'pptgen', ignore_patterns, ['*.json']))
