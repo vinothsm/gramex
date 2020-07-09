@@ -148,12 +148,11 @@ class TestFileHandler(TestGramex):
 
     def test_rmarkdown(self):
         # install rmarkdown if missing
-        # r('''
-        #     packages <- c('rmarkdown')
-        #     new.packages <- packages[!(packages %in% installed.packages()[,"Package"])]
-        #     if (length(new.packages)) install.packages(new.packages)
-        # ''')
-        r('install.packages("rmarkdown")')
+        r('''
+            packages <- c('rmarkdown')
+            new.packages <- packages[!(packages %in% installed.packages()[,"Package"])]
+            if (length(new.packages)) install.packages(new.packages)
+        ''')
 
         def _callback(f):
             f = f.result()
