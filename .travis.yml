@@ -47,7 +47,7 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda install -y -q colorama h5py lxml matplotlib pandas pytest seaborn sqlalchemy line_profiler tzlocal scikit-learn
   # rpy2 v2.9.6 is compatible with pandas 1.0, not available on the default channel
-  - conda install -c conda-forge rpy2 rmarkdown
+  - conda install -c conda-forge rpy2
   # Install node.js
   - nvm install 12
   # Set up variables

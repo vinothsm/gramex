@@ -148,8 +148,8 @@ class TestFileHandler(TestGramex):
             self.check('/dir/transform/markdown.md', text=markdown.markdown(f.read()))
 
     def test_rmarkdown(self):
-        if os.environ.get('BRANCH', '') not in {'dev', 'master'}:
-            raise SkipTest('Install slow rmarkdown installation only on dev/master')
+        # if os.environ.get('BRANCH', '') not in {'dev', 'master'}:
+        #     raise SkipTest('Install slow rmarkdown installation only on dev/master')
         # install rmarkdown if missing
         r('''
             packages <- c('rmarkdown')
