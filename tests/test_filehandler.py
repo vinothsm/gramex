@@ -9,7 +9,6 @@ from gramex.http import OK, FORBIDDEN, METHOD_NOT_ALLOWED
 from orderedattrdict import AttrDict
 from gramex.ml import r
 from gramex.transforms import badgerfish, rmarkdown
-from nose.plugins.skip import SkipTest
 from . import server, tempfiles, TestGramex, folder
 
 
@@ -148,14 +147,13 @@ class TestFileHandler(TestGramex):
             self.check('/dir/transform/markdown.md', text=markdown.markdown(f.read()))
 
     def test_rmarkdown(self):
-        # if os.environ.get('BRANCH', '') not in {'dev', 'master'}:
-        #     raise SkipTest('Install slow rmarkdown installation only on dev/master')
         # install rmarkdown if missing
-        r('''
-            packages <- c('rmarkdown')
-            new.packages <- packages[!(packages %in% installed.packages()[,"Package"])]
-            if (length(new.packages)) install.packages(new.packages)
-        ''')
+        # r('''
+        #     packages <- c('rmarkdown')
+        #     new.packages <- packages[!(packages %in% installed.packages()[,"Package"])]
+        #     if (length(new.packages)) install.packages(new.packages)
+        # ''')
+        r('install.packages("rmarkdown")')
 
         def _callback(f):
             f = f.result()
