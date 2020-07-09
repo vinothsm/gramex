@@ -556,10 +556,10 @@ def table_align(shape, spec, data: dict):
             para.alignment = val
 
 
-def table_vertical_align(shape, spec, data: dict):
+def table_assign(convert, attr, shape, spec, data: dict):
     val = expr(spec, data)
     if val is not None:
-        shape.vertical_anchor = alignment(MSO_VERTICAL_ANCHOR, val)
+        setattr(shape, attr, convert(val))
 
 
 def _resize(elements, n):
@@ -574,17 +574,15 @@ table_commands = {
     'text': text,
     'fill': partial(set_color, 'fill'),
     'fill-opacity': partial(set_opacity, 'fill'),
-    # 'stroke': partial(set_color, 'line.fill'),
-    # 'stroke-opacity': partial(set_opacity, 'line.fill'),
-    # 'stroke-width': stroke_width,
     'align': table_align,
-    'vertical-align': table_vertical_align,
-    # level: ...
-    # margin-left: 0.1 pt
-    # margin-right: 0.1 pt
-    # margin-top: 0.1 pt
-    # margin-bottom: 0.1 pt
-    # width: column-wise width
+    # TODO: table borders
+    'vertical-align': partial(
+        table_assign, partial(alignment, MSO_VERTICAL_ANCHOR), 'vertical_anchor'),
+    'margin-left': partial(table_assign, length, 'margin_left'),
+    'margin-right': partial(table_assign, length, 'margin_right'),
+    'margin-top': partial(table_assign, length, 'margin_top'),
+    'margin-bottom': partial(table_assign, length, 'margin_bottom'),
+    # TODO: width: column-wise width
     'bold': partial(set_text, 'bold', False),
     'color': partial(set_text, 'color', True),     # PPT needs colors on runs too, not only paras
     'font-name': partial(set_text, 'font-name', False),

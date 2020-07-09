@@ -725,11 +725,19 @@ class TestPPTGen(TestCase):
                 'देश': True,
                 'city': {'expr': 'cell.pos.row % 2'},
             },
+            'margin-left': {
+                'देश': '0.05 in',
+                'city': {'expr': '0 if cell.pos.column % 2 else "0.1 in"'},
+            },
+            'margin-right': '1 pt',
+            'margin-top': {'expr': '0 if cell.pos.column % 2 else "0.1 in"'},
+            'margin-bottom': 0,
             'underline': {'expr': 'cell.pos.column % 2'},
             'vertical-align': {
                 'देश': 'middle',
                 'city': {'expr': '"top" if cell.pos.row % 2 else "bottom"'},
             },
+            # Add text: at the end to verify that it over-rides bold:, italic:, etc
             'text': '{cell.pos.row} {cell.pos.column} <a italic="y">{cell.index}</a> ' +
                     '{cell.column} {cell.val} {cell.row.size} {cell.data.size}',
         }}
@@ -779,6 +787,13 @@ class TestPPTGen(TestCase):
                         MVA.MIDDLE if column == 'देश' else
                         (MVA.TOP if i % 2 else MVA.BOTTOM) if column == 'city' else
                         None)
+                    eq_(cell.margin_left,
+                        pptx.util.Inches(0.05) if column == 'देश' else
+                        pptx.util.Inches(0 if j % 2 else 0.1) if column == 'city' else
+                        pptx.util.Inches(0.1))
+                    eq_(cell.margin_right, pptx.util.Pt(1))
+                    eq_(cell.margin_top, pptx.util.Inches(0 if j % 2 else 0.1))
+                    eq_(cell.margin_bottom, 0)
 
     # TODO: if we delete slide 6 and use slides=[6, 7], this causes an error
     def test_copy_slide(self, slides=[7, 8]):
