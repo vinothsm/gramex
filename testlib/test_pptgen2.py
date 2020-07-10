@@ -13,6 +13,7 @@ from pptx.dml.color import _NoneColor
 from pptx.enum.dml import MSO_THEME_COLOR, MSO_FILL
 from pptx.enum.text import PP_ALIGN, MSO_VERTICAL_ANCHOR as MVA
 from pptx.oxml.ns import _nsmap, qn
+from testfixtures import LogCapture
 from unittest import TestCase
 from . import folder, sales_file
 
@@ -207,6 +208,17 @@ class TestPPTGen(TestCase):
         prs = Presentation(self.output)
         eq_(len(prs.slides), 1)
         eq_(prs.slides[0].shapes.title.text, self.prs.slides[0].shapes.title.text)
+
+    def test_incorrect(self, slides=1):
+        with LogCapture() as logs:
+            pptgen(source=self.input, only=slides, rules=[
+                {'No-Shape': {'left': 0}},
+                {'Title 1': {'no-command': 0}}
+            ])
+        logs.check(
+            ('gramex', 'WARNING', 'pptgen2: No shape matches pattern: No-Shape'),
+            ('gramex', 'WARNING', 'pptgen2: Unknown command: no-command on shape: Title 1')
+        )
 
     def test_slide_filter(self, slides=[1, 2, 3]):
         # Rules are specified as rule-name={shape: {rule}, ...}
@@ -437,15 +449,18 @@ class TestPPTGen(TestCase):
         prs = pptgen(source=self.input, target=self.output, only=slides, rules=[
             {'Group 1': {
                 'clone-shape': data,
-                'top': {'expr': '1 + clone.val'},
+                'data': {'myclone': 'clone'},
+                'top': {'expr': '1 + myclone.val'},
                 'Picture': {
                     'clone-shape': data,
-                    'left': {'expr': '1 + clone.val / 2'},
+                    'data': {'subclone': 'clone'},
+                    'left': {'expr': '1 + subclone.val / 2'},
                     'image-width': 0.2,
                 },
                 'Caption': {
                     'clone-shape': data,
-                    'left': {'expr': '1 + clone.val / 2'},
+                    'data': {'subclone2': 'clone'},
+                    'left': {'expr': '1 + subclone2.val / 2'},
                     'text': '{clone.pos}, {clone.key}, {clone.val}, {clone.shape.text}, ' +
                             '{clone.parent.key}, {clone.parent.val}',
                     'fill': 'red',
@@ -802,16 +817,17 @@ class TestPPTGen(TestCase):
             {
                 'slide-numbers': [1, 2],
                 'copy-slide': data,
+                'data': {'mycopy': 'copy'},
                 'Title 1': {'text': 'f"{copy.pos}: {copy.key} - {copy.val}: {len(copy.slides)}"'},
-                'TL': {'top': 'copy.val', 'left': 'copy.val'},
-                'TC': {'top': 'copy.val', 'left': 'copy.val * 2'},
-                'TR': {'top': 'copy.val', 'left': 'copy.val * 3'},
-                'CL': {'top': 'copy.val * 2', 'left': 'copy.val'},
-                'CC': {'top': 'copy.val * 2', 'left': 'copy.val * 2'},
-                'CR': {'top': 'copy.val * 2', 'left': 'copy.val * 3'},
-                'BL': {'top': 'copy.val * 3', 'left': 'copy.val'},
-                'BC': {'top': 'copy.val * 3', 'left': 'copy.val * 2'},
-                'BR': {'top': 'copy.val * 3', 'left': 'copy.val * 3'},
+                'TL': {'top': 'copy.val', 'left': 'mycopy.val'},
+                'TC': {'top': 'copy.val', 'left': 'mycopy.val * 2'},
+                'TR': {'top': 'copy.val', 'left': 'mycopy.val * 3'},
+                'CL': {'top': 'copy.val * 2', 'left': 'mycopy.val'},
+                'CC': {'top': 'copy.val * 2', 'left': 'mycopy.val * 2'},
+                'CR': {'top': 'copy.val * 2', 'left': 'mycopy.val * 3'},
+                'BL': {'top': 'copy.val * 3', 'left': 'mycopy.val'},
+                'BC': {'top': 'copy.val * 3', 'left': 'mycopy.val * 2'},
+                'BR': {'top': 'copy.val * 3', 'left': 'mycopy.val * 3'},
             }
         ])
         # All shapes are copied into 3 slides?
