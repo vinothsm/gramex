@@ -45,6 +45,7 @@ def pptgen(source: Union[str, pptx.presentation.Presentation],
     :arg handler: if PPTXHandler passes a handler, make it available to the commands as a variable
     :return: target PPTX
     '''
+    # TODO: source can be an expression. PPTXHandler may need to use multiple themes
     prs = source if isinstance(source, pptx.presentation.Presentation) else Presentation(source)
     # Load data with additional variables:
     #   prs: source presentation
@@ -68,8 +69,7 @@ def pptgen(source: Union[str, pptx.presentation.Presentation],
     for rule in copy.deepcopy(rules):
         # slide_data is the data for this rule. If `data:` is specified, override original data
         slide_data = load_data(rule.get('data', {}), _default_key='function', **data)
-        slides_in_rule = tuple(slide_filter(
-            slides, rule.get('slide-number', []), rule.get('slide-title', [])))
+        slides_in_rule = tuple(slide_filter(slides, rule, slide_data))
         if len(slides_in_rule) == 0:
             # TODO: warn user that no slides matched this rule
             continue
@@ -241,25 +241,27 @@ def pick_only_slides(prs: Presentation, only: Union[int, List[int]] = None) -> l
     return list(prs.slides)
 
 
-def slide_filter(slides, numbers: Union[int, List[int]], titles: Union[str, List[str]]):
+def slide_filter(slides, rule: dict, data: dict):
     '''
     Filter slides. Return iterable of (index, slide) for only those slides matching numbers/titles.
 
     :arg Slides slides: a Slides object (e.g. ``prs.slides``) to select slides from
-    :arg int/list numbers: slide number(s) to filter. 1 is the first slide. [1, 3] is slides 1 & 3
-    :arg str/list titles: slide title pattern(s) to filter. "*Match*" matches all slides with
-        "match" anywhere in the title (case-insensitive)
+    :arg dict rule: a dict that may have a ``slide-number`` or ``slide-title`` key to filter by.
+        These can be expressions. ``slide-number`` is the slide number(s) to filter. 1 is the first
+        slide. ``[1, 3]`` is slides 1 & 3. ``slide-title`` has the slide title pattern(s) to filter
+        e.g. ``*Match*`` matches all slides with "match" anywhere in the title (case-insensitive).
+    :arg dict data: data context for the rule
     :return: an iterable that yields (index, slide)
     '''
-    # TODO: allow slide numbers and slide-titles to be data-driven
-    # slide_numbers is the SET of 1-indexed slide numbers this rule applies to
-    slide_numbers = set(numbers if isinstance(numbers, list) else [numbers])
-
+    numbers = commands.expr(rule.get('slide-number', []), data)
+    titles = commands.expr(rule.get('slide-title', []), data)
+    # numbers is the SET of 1-indexed slide numbers this rule applies to
+    numbers = set(numbers if isinstance(numbers, list) else [numbers])
     # titles is a LIST of title patterns - ANY of which the slide title must match
     titles = titles if isinstance(titles, list) else [titles]
-
+    # yield only the slides that match these conditions
     for index, slide in enumerate(slides):
-        if slide_numbers and (index + 1 not in slide_numbers):
+        if numbers and (index + 1 not in numbers):
             continue
         title = slide.shapes.title.text if slide.shapes.title else ''
         if titles and (not any(fnmatchcase(title.lower(), pattern.lower()) for pattern in titles)):
