@@ -150,6 +150,16 @@ class TestPPTGen(TestCase):
             length('-3.4')
         with assert_raises(ValueError):
             length(None)
+        length_class = commands.length_class
+        for unit in ('"', 'in', 'inch', 'inches', 'IN', 'Inch', 'INCHes', ''):
+            eq_(length_class(unit), pptx.util.Inches)
+        for unit in ('emu', 'Emu', 'EMU'):
+            eq_(length_class(unit), pptx.util.Emu)
+        for unit in ('cp', 'CentiPoint', 'CENTIPoints'):
+            eq_(length_class(unit), pptx.util.Centipoints)
+        with assert_raises(ValueError):
+            eq_(length_class('nonunits'))
+
 
     def test_unit(self):
         rule = {'Title 1': {'width': 10}}
@@ -710,11 +720,12 @@ class TestPPTGen(TestCase):
 
     def test_table(self, slides=9):
         data = self.data.head(10)       # The 10th row has NaNs. Ensure the row is included
+        headers = ['<a color="red">देश</a>', 'city', '<p>prod</p><p>uct</p>', 'Sales']
         prs = pptgen(source=self.input, target=self.output, only=slides, mode='expr',
                      data={'data': data},
                      rules=[
-                         {'Table 1': {'table': {'data': 'data'}}},
-                         {'Table 2': {'table': {'data': 'data'}}},
+                         {'Table 1': {'table': {'data': 'data', 'header-row': headers}}},
+                         {'Table 2': {'table': {'data': 'data', 'width': 2}}},
                      ])
         for row_offset, shape_name in ((1, 'Table 1'), (0, 'Table 2')):
             table = self.get_shape(prs.slides[0].shapes, shape_name).table
@@ -722,13 +733,48 @@ class TestPPTGen(TestCase):
                 for j, (column, val) in enumerate(row.iteritems()):
                     cell = table.rows[i + row_offset].cells[j]
                     eq_(cell.text, '{}'.format(val))
+        # Test table header
+        header = self.get_shape(prs.slides[0].shapes, 'Table 1').table.rows[0].cells
+        eq_(header[0].text, 'देश')
+        eq_(header[0].text_frame.paragraphs[0].runs[0].font.color.rgb, (255, 0, 0))
+        eq_(header[2].text_frame.paragraphs[0].text, 'prod')
+        eq_(header[2].text_frame.paragraphs[1].text, 'uct')
+        eq_(header[4].text, 'Table 1')      # Inherited from the template
+        # Test column widths
+        gridcols = self.get_shape(prs.slides[0].shapes, 'Table 2').table._tbl.tblGrid.gridCol_lst
+        all(v.get('w') == pptx.util.Inches(2) for v in gridcols)
 
+        # If there's no table data, text is copied from source
+        prs = pptgen(source=self.input, target=self.output, only=slides, mode='expr', rules=[
+            {'Table 2': {'table': {
+                'header-row': True,
+                'fill': '"red" if "Val" in cell.val else "yellow"',
+            }}}
+        ])
+        table = self.get_shape(prs.slides[0].shapes, 'Table 2').table
+        eq_(table.rows[1].cells[0].fill.fore_color.rgb, (255, 0, 0))
+        eq_(table.rows[1].cells[1].fill.fore_color.rgb, (255, 255, 0))
+        prs = pptgen(source=self.input, target=self.output, only=slides, mode='expr', rules=[
+            {'Table 2': {'table': {
+                'fill': '"red" if "Table" in cell.val else "yellow"',
+            }}}
+        ])
+        table = self.get_shape(prs.slides[0].shapes, 'Table 2').table
+        eq_(table.rows[0].cells[0].fill.fore_color.rgb, (255, 0, 0))
+        eq_(table.rows[0].cells[1].fill.fore_color.rgb, (255, 255, 0))
+
+        # Test all table commands comprehensively
         cmds = {'table': {
             'data': data,
             'header-row': False,
             'total-row': True,
             'first-column': True,
             'last-column': True,
+            'width': {
+                'देश': '1 in',
+                'city': {'expr': '"2 in" if cell.column == "city" else "1 in"'},
+                'product': {'expr': '"2 in" if cell.column == "city" else "1.5 in"'},
+            },
             'align': {'expr': '"left" if cell.pos.row % 2 else "right"'},
             'bold': {'expr': 'cell.pos.row % 2'},
             'color': {'expr': '"red" if cell.pos.row % 3 else "green"'},
@@ -770,14 +816,21 @@ class TestPPTGen(TestCase):
             eq_(table.last_row, True)
             eq_(table.first_col, True)
             eq_(table.last_col, True)
+            # Check column widths for changed columns
+            gridcols = table._tbl.tblGrid.gridCol_lst
+            eq_(int(gridcols[0].get('w')), pptx.util.Inches(1))
+            eq_(int(gridcols[1].get('w')), pptx.util.Inches(2))
+            eq_(int(gridcols[2].get('w')), pptx.util.Inches(1.5))
+
             # Check cell contents
             maxrow, maxcol = len(src_table.rows) - 1, len(src_table.columns) - 1
             for i, (index, row) in enumerate(data.iterrows()):
                 # Row height is the same as in the source table (or its last row)
                 eq_(table.rows[i].height, src_table.rows[min(i, maxrow)].height)
                 for j, (column, val) in enumerate(row.iteritems()):
-                    # Column width is the same as in the source table (or its last column)
-                    eq_(table.columns[j].width, src_table.columns[min(j, maxcol)].width)
+                    # Unspecified col width is the same as in the source table (or its last col)
+                    if column in {'sales', 'growth'}:
+                        eq_(table.columns[j].width, src_table.columns[min(j, maxcol)].width)
                     # Text matches, and all cell.* attributes are correct
                     cell = table.rows[i].cells[j]
                     paras = cell.text_frame.paragraphs
@@ -809,6 +862,24 @@ class TestPPTGen(TestCase):
                     eq_(cell.margin_right, pptx.util.Pt(1))
                     eq_(cell.margin_top, pptx.util.Inches(0 if j % 2 else 0.1))
                     eq_(cell.margin_bottom, 0)
+
+        # table: can only apply to a table element, not text
+        with assert_raises(ValueError):
+            pptgen(source=self.input, only=slides, rules=[{'Title 1': {'table': {}}}])
+        # table.data: must be a DataFrame
+        with assert_raises(ValueError):
+            pptgen(source=self.input, only=slides, rules=[{'Table 1': {'table': {'data': []}}}])
+        # Invalid column names raise a warning
+        with LogCapture() as logs:
+            pptgen(source=self.input, only=slides, rules=[{'Table 1': {'table': {
+                'data': self.data.head(3),
+                'width': {'NA1': 1},
+                'text': {'NA2': 0},
+            }}}])
+        logs.check(
+            ('gramex', 'WARNING', 'pptgen2: No column: NA1 in table: Table 1'),
+            ('gramex', 'WARNING', 'pptgen2: No column: NA2 in table: Table 1'),
+        )
 
     # TODO: if we delete slide 6 and use slides=[6, 7], this causes an error
     def test_copy_slide(self, slides=[7, 8]):
@@ -861,7 +932,7 @@ class TestPPTGen(TestCase):
             eq_(para.runs[1]._r.find('.//' + qn('a:hlinkClick')).get('action'),
                 'ppaction://hlinkshowjump?jump=firstslide')
 
-    @classmethod
-    def tearDown(cls):
-        if os.path.exists(cls.output):
-            os.remove(cls.output)
+    # @classmethod
+    # def tearDown(cls):
+    #     if os.path.exists(cls.output):
+    #         os.remove(cls.output)

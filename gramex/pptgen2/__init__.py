@@ -5,9 +5,12 @@ The main loop is in :py:func:`pptgen`, which calls other functions as required.
 '''
 
 import copy
+import gramex
 import gramex.data
+import os
 import pandas as pd
 import pptx
+import sys
 from fnmatch import fnmatchcase
 from gramex.config import app_log
 from gramex.transforms import build_transform
@@ -16,6 +19,7 @@ from pptx import Presentation
 from pptx.oxml import parse_xml
 from pptx.oxml.ns import _nsmap, qn
 from pptx.shapes.shapetree import SlideShapes
+from textwrap import dedent
 from typing import Union, List, Dict
 from . import commands
 
@@ -110,6 +114,11 @@ rule_cmdlist = {
     'slide-title',
     'transition',
 }
+# List of special commands that can be used that are not in commands.cmdlist
+special_cmdlist = {
+    'clone-shape',
+    'data',
+}
 
 
 def apply_commands(rule: Dict[str, dict], shapes, data: dict):
@@ -153,7 +162,7 @@ def apply_commands(rule: Dict[str, dict], shapes, data: dict):
                 for cmd in spec:
                     if cmd in commands.cmdlist:
                         commands.cmdlist[cmd](clone.shape, spec[cmd], shape_data)
-                    else:
+                    elif cmd not in special_cmdlist:
                         app_log.warn('pptgen2: Unknown command: %s on shape: %s', cmd, pattern)
                 # If the shape is a group, apply spec to each sub-shape
                 if shape.element.tag.endswith('}grpSp'):
@@ -417,3 +426,50 @@ def iterate_on(spec, data: dict):
         return val
     else:
         raise ValueError('Cannot iterate over %s: %r' % (type(val), val))
+
+
+def commandline(args=None):
+    '''
+    usage: slidesense [config.yaml] [url-name] [--source=...] [--target=...] [--data=...]
+
+    Generates target PPTX from a source PPTX, applying rules in config file and opens it.
+    If no config file is specified, uses `gramex.yaml` in the current directory.
+
+    The config file can have a pptgen configuration like {source: ..., target: ..., rules: ...}
+    or be a `gramex.yaml` with `url: {url-name: {handler: PPTXHandler, kwargs: {source: ...}}}`
+    Rules are picked up from the first PPTXHandler URL that matches `url-name`,
+    or the first PPTXHandler in `gramex.yaml`.
+
+    --source=... overrides source PPTX path in config file
+    --target=... overrides target PPTX path in config file (defaults to output.pptx)
+    --data=...   overrides data file in config path
+    --open=n     don't open target PPTX after generating it.
+    '''
+    args = gramex.parse_command_line(sys.argv[1:] if args is None else args)
+
+    if 'help' in args or (not args['_'] and not os.path.exists('gramex.yaml')):
+        return gramex.console(dedent(commandline.__doc__).strip())
+
+    config_file, *urls = args.pop('_') or ['gramex.yaml']
+    conf = gramex.cache.open(config_file, 'config')
+
+    if 'url' in conf:
+        for key, spec in conf.url.items():
+            if spec.handler == 'PPTXHandler':
+                    if not urls or any(url in key for url in urls):
+                        rules = spec.kwargs
+                        break
+        else:
+            return gramex.console(f'No PPTXHandler matched in file: {config_file}')
+    elif any(key in conf for key in ('source', 'target', 'data', 'rules')):
+        rules = conf
+    else:
+        return gramex.console(f'No rules found in file: {config_file}')
+
+    gramex.config.merge(rules, args)
+    rules.setdefault('target', 'output.pptx')
+    rules.setdefault('mode', 'expr')
+    gramex.console(f'Creating {rules["target"]}')
+    gramex.pptgen2.pptgen(**rules)
+    if rules.get('open', True):
+        os.startfile(rules['target'])
