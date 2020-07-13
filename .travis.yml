@@ -65,7 +65,7 @@ script:
   - gramex license accept
   - gramex setup --all  # ensure node-sass, puppetter exists
 
-  # Run tests, explicitly showing code coverage
+  # Run tests, explicitly showing test coverage
   - make test-setup
   - coverage run -m nose
   - coverage report -m
