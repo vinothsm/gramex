@@ -9,6 +9,7 @@ from gramex.http import OK, FORBIDDEN, METHOD_NOT_ALLOWED
 from orderedattrdict import AttrDict
 from gramex.ml import r
 from gramex.transforms import badgerfish, rmarkdown
+from nose.tools import ok_
 from nose.plugins.skip import SkipTest
 from . import server, tempfiles, TestGramex, folder
 
