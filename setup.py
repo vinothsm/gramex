@@ -32,8 +32,6 @@ install_requires = [
     'lxml',                         # OPT: (conda) gramex.pptgen
     'markdown',                     # OPT: transforms, gramex.services.create_alert()
     'matplotlib',                   # OPT: (conda) gramex.data.download()
-    'numpy >= 1.16, < 1.17',        # REQ: See https://bitbucket.org/rpy2/rpy2/issues/572
-                                    #      For rmarkdown to work, freeze the numpy version for now
     'oauthlib >= 1.1.2',            # SRV: OAuth request-signing
     'orderedattrdict >= 1.6.0',     # REQ: OrderedDict with attr access for configs
     'pandas == 0.25.3',             # REQ: (conda) gramex.data.filter()
