@@ -4,7 +4,7 @@ import os
 import pandas as pd
 import pptx
 from gramex.config import objectpath
-from gramex.pptgen2 import pptgen, load_data, commands
+from gramex.pptgen2 import pptgen, load_data, commands, commandline
 from nose.tools import eq_, ok_, assert_raises
 from orderedattrdict import AttrDict
 from pandas.util.testing import assert_frame_equal as afe
@@ -13,7 +13,7 @@ from pptx.dml.color import _NoneColor
 from pptx.enum.dml import MSO_THEME_COLOR, MSO_FILL
 from pptx.enum.text import PP_ALIGN, MSO_VERTICAL_ANCHOR as MVA
 from pptx.oxml.ns import _nsmap, qn
-from testfixtures import LogCapture
+from testfixtures import LogCapture, OutputCapture
 from unittest import TestCase
 from . import folder, sales_file
 
@@ -33,6 +33,11 @@ class TestPPTGen(TestCase):
         cls.output = os.path.join(folder, 'output.pptx')
         cls.image = os.path.join(folder, 'small-image.jpg')
         cls.data = pd.read_excel(sales_file, encoding='utf-8')
+        if os.path.exists(cls.output):
+            os.remove(cls.output)
+
+    @classmethod
+    def remove_output(cls):
         if os.path.exists(cls.output):
             os.remove(cls.output)
 
@@ -160,7 +165,6 @@ class TestPPTGen(TestCase):
         with assert_raises(ValueError):
             eq_(length_class('nonunits'))
 
-
     def test_unit(self):
         rule = {'Title 1': {'width': 10}}
         for unit in units:
@@ -225,7 +229,7 @@ class TestPPTGen(TestCase):
                 {'No-Shape': {'left': 0}},
                 {'Title 1': {'no-command': 0}}
             ])
-        logs.check(
+        logs.check_present(
             ('gramex', 'WARNING', 'pptgen2: No shape matches pattern: No-Shape'),
             ('gramex', 'WARNING', 'pptgen2: Unknown command: no-command on shape: Title 1')
         )
@@ -247,6 +251,11 @@ class TestPPTGen(TestCase):
         prs = pptgen(source=self.input, only=slides, rules=[rule1, rule2])
         eq_(self.get_shape(prs.slides[0].shapes, 'Title 1').width, pptx.util.Inches(10))
         eq_(self.get_shape(prs.slides[2].shapes, 'Rectangle 1').width, pptx.util.Inches(20))
+        with LogCapture() as logs:
+            pptgen(source=self.input, only=slides, rules=[{'slide-number': 5}])
+        logs.check_present(
+            ('gramex', 'WARNING', 'pptgen2: No slide with slide-number: 5, slide-title: None'),
+        )
 
     def test_transition(self, slides=[1, 2, 3]):
         prs = pptgen(source=self.input, target=self.output, only=slides, rules=[
@@ -876,7 +885,7 @@ class TestPPTGen(TestCase):
                 'width': {'NA1': 1},
                 'text': {'NA2': 0},
             }}}])
-        logs.check(
+        logs.check_present(
             ('gramex', 'WARNING', 'pptgen2: No column: NA1 in table: Table 1'),
             ('gramex', 'WARNING', 'pptgen2: No column: NA2 in table: Table 1'),
         )
@@ -932,7 +941,39 @@ class TestPPTGen(TestCase):
             eq_(para.runs[1]._r.find('.//' + qn('a:hlinkClick')).get('action'),
                 'ppaction://hlinkshowjump?jump=firstslide')
 
-    # @classmethod
-    # def tearDown(cls):
-    #     if os.path.exists(cls.output):
-    #         os.remove(cls.output)
+    def test_commandline(self):
+        # "slidesense" prints usage
+        with OutputCapture() as logs:
+            commandline([])
+        ok_(logs.captured.startswith('usage: slidesense'))
+        # "slidesense nonexistent.yaml" prints an error
+        with LogCapture() as logs:
+            commandline(['nonexistent.yaml'])
+        logs.check_present(
+            ('gramex', 'ERROR', 'No rules found in file: nonexistent.yaml')
+        )
+        # "slidesense gramex.yaml nonexistent-url" prints an error
+        with LogCapture() as logs:
+            path = os.path.join(folder, 'slidesense-gramex.yaml')
+            commandline([path, 'nonexistent-url'])
+        logs.check_present(
+            ('gramex', 'ERROR', 'No PPTXHandler matched in file: ' + path)
+        )
+
+        target = os.path.join(folder, 'output.pptx')
+        non_target = os.path.join(folder, 'nonexistent.pptx')
+
+        for args in (
+            ('slidesense-config.yaml', ),
+            ('slidesense-gramex.yaml', ),
+            ('slidesense-gramex.yaml', 'slidesense-test'),
+        ):
+            self.remove_output()
+            commandline([os.path.join(folder, args[0]), *args[1:],
+                         f'--target={target}', '--no-open'])
+            ok_(os.path.exists(target))
+            ok_(not os.path.exists(non_target))
+
+    @classmethod
+    def tearDown(cls):
+        cls.remove_output()

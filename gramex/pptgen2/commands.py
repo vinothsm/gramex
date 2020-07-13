@@ -519,15 +519,16 @@ def set_text(attr, on_run, shape, spec, data):
 def image(shape, spec, data: dict):
     val = expr(spec, data)
     if val is not None:
-        rid = shape._pic.blipFill.blip.rEmbed
-        part = shape.part.related_parts[rid]
-        # TODO: This REPLACES the image. We must CREATE an image. Else cloning images fails
+        # Load image contents as a bytestring
         if urlparse(val).netloc:
-            part._blob = requests.get(val).content
+            content = requests.get(val).content
         else:
-            part._blob = gramex.cache.open(val, 'bin')
-        # Preserve aspect ratio and width. Adjust height
-        img = Image.open(io.BytesIO(part._blob))
+            content = gramex.cache.open(val, 'bin')
+        # Add the image part
+        image_part, rid = shape.part.get_or_add_image_part(io.BytesIO(content))
+        shape.element.blipFill.blip.rEmbed = rid
+        # Preserve aspect ratio and width. Adjust height via a "cover" algorithm
+        img = Image.open(io.BytesIO(content))
         img_width, img_height = img.size
         shape.height = int(shape.width * img_height / img_width)
 
@@ -602,7 +603,6 @@ table_cell_commands = {
 table_col_commands = {
     'width': table_width,
 }
-
 
 
 def table(shape, spec, data: dict):

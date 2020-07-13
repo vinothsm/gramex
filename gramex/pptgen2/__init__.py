@@ -73,8 +73,10 @@ def pptgen(source: Union[str, pptx.presentation.Presentation],
     # Loop through each rule (copying them to protect from modification)
     for rule in copy.deepcopy(rules):
         slides_in_rule = tuple(slide_filter(slides, rule, data))
+        # If no slides matched, warn the user
         if len(slides_in_rule) == 0:
-            # TODO: warn user that no slides matched this rule
+            app_log.warn('pptgen2: No slide with slide-number: %s, slide-title: %s',
+                         rule.get('slide-number'), rule.get('slide-title'))
             continue
         # Copy slides after the last mapped position of the last slide in this rule
         max_index = max(index for index, slide in slides_in_rule)
@@ -154,6 +156,7 @@ def apply_commands(rule: Dict[str, dict], shapes, data: dict):
                 clones.append(AttrDict(pos=i, key=clone_key, val=clone_val, shape=shape,
                                        parent=parent_clone))
             # Run commands in the spec on all cloned shapes
+            is_group = shape.element.tag.endswith('}grpSp')
             for i, clone in enumerate(clones):
                 # Include shape-level `data:`. Add shape, clone as variables
                 shape_data = load_data(
@@ -162,12 +165,15 @@ def apply_commands(rule: Dict[str, dict], shapes, data: dict):
                 for cmd in spec:
                     if cmd in commands.cmdlist:
                         commands.cmdlist[cmd](clone.shape, spec[cmd], shape_data)
-                    elif cmd not in special_cmdlist:
+                    # Warn on unknown commands. But don't warn on groups -- they have sub-shapes
+                    elif cmd not in special_cmdlist and not is_group:
                         app_log.warn('pptgen2: Unknown command: %s on shape: %s', cmd, pattern)
                 # If the shape is a group, apply spec to each sub-shape
-                if shape.element.tag.endswith('}grpSp'):
+                if is_group:
                     apply_commands(spec, SlideShapes(clone.shape.element, shapes), shape_data)
-        if not shape_matched:
+        # Warn if the pattern is neither a shape nor a command
+        if (not shape_matched and pattern not in special_cmdlist and
+                pattern not in commands.cmdlist):
             app_log.warn('pptgen2: No shape matches pattern: %s', pattern)
 
 
@@ -443,7 +449,7 @@ def commandline(args=None):
     --source=... overrides source PPTX path in config file
     --target=... overrides target PPTX path in config file (defaults to output.pptx)
     --data=...   overrides data file in config path
-    --open=n     don't open target PPTX after generating it.
+    --no-open    don't open target PPTX after generating it
     '''
     args = gramex.parse_command_line(sys.argv[1:] if args is None else args)
 
@@ -456,20 +462,19 @@ def commandline(args=None):
     if 'url' in conf:
         for key, spec in conf.url.items():
             if spec.handler == 'PPTXHandler':
-                    if not urls or any(url in key for url in urls):
-                        rules = spec.kwargs
-                        break
+                if not urls or any(url in key for url in urls):
+                    rules = spec.kwargs
+                    break
         else:
-            return gramex.console(f'No PPTXHandler matched in file: {config_file}')
+            return app_log.error(f'No PPTXHandler matched in file: {config_file}')
     elif any(key in conf for key in ('source', 'target', 'data', 'rules')):
         rules = conf
     else:
-        return gramex.console(f'No rules found in file: {config_file}')
+        return app_log.error(f'No rules found in file: {config_file}')
 
     gramex.config.merge(rules, args)
     rules.setdefault('target', 'output.pptx')
     rules.setdefault('mode', 'expr')
-    gramex.console(f'Creating {rules["target"]}')
     gramex.pptgen2.pptgen(**rules)
-    if rules.get('open', True):
+    if not rules.get('no-open', False):
         os.startfile(rules['target'])
